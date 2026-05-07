@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Baker House — 4.567</title>
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+</head>
+<body>
+
+  <!-- ── Navigation ──────────────────────────────── -->
+  <nav class="nav" aria-label="Site navigation">
+    <a href="#" class="nav-brand">Baker House</a>
+    <ul class="nav-links">
+      <li><a href="#galleries">Drawings &amp; Renders</a></li>
+    </ul>
+  </nav>
+
+  <!-- ── Main content ─────────────────────────────── -->
+  <main id="main">
+    <section id="galleries" class="sec-light" aria-label="Plan drawings, iso renders, and 3D model">
+      <div class="container">
+        <p class="sec-kicker">Baker House — Alvar Aalto, MIT 1948</p>
+        <h2 class="sec-heading">Drawings &amp; Model</h2>
+
+        <div class="galleries-layout">
+
+          <!-- Col 1: Plan / Sketch image -->
+          <div class="g-plan">
+            <p class="g-sublabel">Plan Drawings / Sketches</p>
+            <div class="g1-img-frame" id="g1-img-frame">
+              <img class="g1-img" id="g1-img" src="" alt="Floor plan view" />
+              <div class="g1-floor-badge" id="g1-badge">Ground Floor</div>
+              <div class="mag-lens" id="mag-lens"></div>
+            </div>
+            <!-- BIM / Sketch toggle -->
+            <div class="g-controls">
+              <span class="g1-toggle-label">View</span>
+              <div class="toggle-sw" role="group" aria-label="Toggle BIM drawing or sketch">
+                <button class="toggle-btn active" data-mode="plan">BIM Drawing</button>
+                <button class="toggle-btn"        data-mode="sketch">Sketch</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Col 2: Iso render image -->
+          <div class="g-iso">
+            <p class="g-sublabel">Iso Render — Floor Section</p>
+            <div class="g2-img-frame">
+              <img class="g2-img" id="g2-img" src="" alt="Isometric floor render" />
+            </div>
+          </div>
+
+          <!-- Col 3: Floor selector + inline 3D viewer -->
+          <div class="g-right">
+            <nav class="floor-nav" id="floor-nav" aria-label="Floor selector">
+              <p class="floor-nav-label">Floor</p>
+              <button class="floor-btn active" data-floor="G">Ground</button>
+              <button class="floor-btn"        data-floor="1">1st Floor</button>
+              <button class="floor-btn"        data-floor="2">2nd Floor</button>
+              <button class="floor-btn"        data-floor="3">3rd Floor</button>
+              <button class="floor-btn"        data-floor="4">4th Floor</button>
+              <button class="floor-btn"        data-floor="5">5th Floor</button>
+              <button class="floor-btn"        data-floor="6">6th Floor</button>
+            </nav>
+
+            <div class="viewer-frame-sm">
+              <model-viewer
+                id="viewer-3d"
+                src="assets/3d/forest_house.glb"
+                alt="Baker House 3D model"
+                camera-controls
+                touch-action="pan-y"
+                interaction-prompt="none"
+                shadow-intensity="1"
+              ></model-viewer>
+              <div class="viewer-status" id="viewer-status">Loading model…</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ── Footer ─────────────────────────────────── -->
+  <footer>
+    <div class="container footer-inner">
+      <div class="footer-left">
+        <h2>Baker House</h2>
+        <p>Alvar Aalto — MIT, 1948</p>
+      </div>
+      <div class="footer-right">
+        <p>4.567 Introduction to BIM</p>
+        <p>Spring 2026</p>
+        <p>MIT School of Architecture and Planning</p>
+      </div>
+    </div>
+  </footer>
+
+  <div class="mag-zoom-panel" id="mag-zoom-panel"></div>
+
+  <script>
+    /* ── Data ──────────────────────────────────────── */
+    const FLOOR_LABELS = {
+      G:   'Ground Floor',
+      '1': '1st Floor', '2': '2nd Floor', '3': '3rd Floor',
+      '4': '4th Floor', '5': '5th Floor', '6': '6th Floor'
+    };
+    const planSrc   = f => `assets/2d/Plan_${f}.jpg`;
+    const sketchSrc = f => `assets/2d/sketch_${f === 'G' ? 'g' : f}.jpg`;
+    const ISO = {
+      G:   'assets/2d/grnd.png',
+      '1': 'assets/2d/1st.png',
+      '2': 'assets/2d/2nd.png',
+      '3': 'assets/2d/3th.png',
+      '4': 'assets/2d/4th.png',
+      '5': 'assets/2d/5th.png',
+      '6': 'assets/2d/6th.png'
+    };
+
+    /* ── State ─────────────────────────────────────── */
+    const state = { floor: 'G', mode: 'plan' };
+
+    /* ── DOM refs ──────────────────────────────────── */
+    const g1Img      = document.getElementById('g1-img');
+    const g1Badge    = document.getElementById('g1-badge');
+    const g2Img      = document.getElementById('g2-img');
+    const viewer3d   = document.getElementById('viewer-3d');
+    const viewerStat = document.getElementById('viewer-status');
+
+    /* ── Gallery update ─────────────────────────────── */
+    function fadeSwap(imgEl, newSrc) {
+      imgEl.style.opacity = '0';
+      setTimeout(() => { imgEl.src = newSrc; imgEl.style.opacity = '1'; }, 230);
+    }
+
+    function updateGalleries() {
+      const src = state.mode === 'plan' ? planSrc(state.floor) : sketchSrc(state.floor);
+      fadeSwap(g1Img, src);
+      fadeSwap(g2Img, ISO[state.floor]);
+      g1Badge.textContent = FLOOR_LABELS[state.floor];
+    }
+
+    /* ── Floor buttons — hover to switch ───────────── */
+    document.querySelectorAll('.floor-btn').forEach(btn => {
+      btn.addEventListener('mouseenter', () => {
+        if (btn.dataset.floor === state.floor) return;
+        state.floor = btn.dataset.floor;
+        document.querySelectorAll('.floor-btn').forEach(b =>
+          b.classList.toggle('active', b.dataset.floor === state.floor)
+        );
+        updateGalleries();
+      });
+    });
+
+    /* ── Mode toggle ────────────────────────────────── */
+    document.querySelectorAll('[data-mode]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.mode = btn.dataset.mode;
+        document.querySelectorAll('[data-mode]').forEach(b =>
+          b.classList.toggle('active', b.dataset.mode === state.mode)
+        );
+        updateGalleries();
+      });
+    });
+
+    /* ── 3D viewer init ─────────────────────────────── */
+    viewer3d.addEventListener('load',  () => { viewerStat.textContent = ''; });
+    viewer3d.addEventListener('error', () => { viewerStat.textContent = 'Model failed to load.'; });
+
+    /* ── Hover zoom (Amazon-style) ─────────────────── */
+    const g1Frame = document.getElementById('g1-img-frame');
+    const magLens = document.getElementById('mag-lens');
+    const magZoom = document.getElementById('mag-zoom-panel');
+    const ZOOM = 3, PSIZ = 280;
+
+    function showZoom(e) {
+      const rect = g1Frame.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      magLens.style.left = x + 'px';
+      magLens.style.top  = y + 'px';
+      const bgX = PSIZ / 2 - x * ZOOM;
+      const bgY = PSIZ / 2 - y * ZOOM;
+      magZoom.style.backgroundImage    = `url('${g1Img.src}')`;
+      magZoom.style.backgroundSize     = `${rect.width * ZOOM}px ${rect.height * ZOOM}px`;
+      magZoom.style.backgroundPosition = `${bgX}px ${bgY}px`;
+      magZoom.style.left = Math.min(e.clientX + 18, window.innerWidth  - PSIZ - 8) + 'px';
+      magZoom.style.top  = Math.max(Math.min(e.clientY - PSIZ / 2, window.innerHeight - PSIZ - 8), 8) + 'px';
+    }
+
+    g1Frame.addEventListener('mouseenter', () => {
+      magLens.style.display = 'block';
+      magZoom.style.display = 'block';
+    });
+    g1Frame.addEventListener('mousemove', showZoom);
+    g1Frame.addEventListener('mouseleave', () => {
+      magLens.style.display = 'none';
+      magZoom.style.display = 'none';
+    });
+
+    /* ── Init ───────────────────────────────────────── */
+    g1Img.src = planSrc('G');
+    g2Img.src = ISO['G'];
+  </script>
+
+</body>
+</html>

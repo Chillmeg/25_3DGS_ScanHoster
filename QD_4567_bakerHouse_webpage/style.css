@@ -1,0 +1,376 @@
+/* ── Design tokens (PlayStation-inspired) ────── */
+:root {
+  --ps-blue:    #0070cc;
+  --ps-cyan:    #1eaedb;
+  --ps-black:   #000000;
+  --ps-shadow-black: #121314;
+  --ps-white:   #ffffff;
+  --ps-ice:     #f5f7fa;
+  --ps-divider: #f3f3f3;
+  --ps-charcoal:#1f1f1f;
+  --ps-gray:    #6b6b6b;
+  --ps-muted:   #cccccc;
+  --font: Arial, Helvetica, sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--font);
+  background: var(--ps-ice);
+  color: var(--ps-charcoal);
+  overflow-x: clip;
+}
+
+/* ── Navigation ──────────────────────────────── */
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  height: 52px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  padding: 0 64px;
+  border-bottom: 1px solid rgba(0,0,0,0.07);
+}
+.nav-brand {
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+  color: var(--ps-charcoal);
+  text-decoration: none;
+}
+.nav-links {
+  display: flex;
+  gap: 32px;
+  list-style: none;
+  margin-left: 40px;
+}
+.nav-links a {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ps-gray);
+  text-decoration: none;
+  transition: color 180ms ease;
+}
+.nav-links a:hover { color: var(--ps-blue); }
+
+/* ── Content container: centered 80% ────────── */
+.container {
+  width: 80%;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+/* ── Main section ────────────────────────────── */
+.sec-light {
+  background: linear-gradient(180deg, var(--ps-white) 0%, var(--ps-ice) 100%);
+  color: var(--ps-charcoal);
+  padding: 72px 0 96px;
+}
+.sec-kicker {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--ps-blue);
+  margin-bottom: 10px;
+}
+.sec-heading {
+  font-size: 28px;
+  font-weight: 300;
+  line-height: 1.25;
+  margin-bottom: 40px;
+  color: var(--ps-charcoal);
+}
+
+/* ── Galleries + 3D layout ───────────────────── */
+/*  3 columns: plan/sketch | iso render | controls+viewer  */
+.galleries-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr 240px;
+  gap: 28px;
+  align-items: start;
+}
+.g-sublabel {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--ps-gray);
+  margin-bottom: 10px;
+}
+
+/* ── Plan / Sketch column ────────────────────── */
+.g-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.g1-img-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--ps-divider);
+  box-shadow: rgba(0,0,0,0.07) 0 4px 12px 0;
+  cursor: crosshair;
+}
+.g1-img {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  object-fit: contain;
+  background: var(--ps-white);
+  transition: opacity 220ms ease;
+}
+.g1-floor-badge {
+  position: absolute;
+  top: 12px; left: 12px;
+  background: rgba(0,0,0,0.55);
+  color: var(--ps-white);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* ── Hover zoom lens circle ──────────────────── */
+.mag-lens {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  border: 1.5px solid rgba(255,255,255,0.85);
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+  pointer-events: none;
+  display: none;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.15);
+}
+
+/* ── Toggle (plan / sketch) ──────────────────── */
+.g-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.g1-toggle-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ps-gray);
+  white-space: nowrap;
+}
+.toggle-sw {
+  display: flex;
+  background: var(--ps-divider);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 3px;
+}
+.toggle-btn {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  color: var(--ps-gray);
+  cursor: pointer;
+  transition: all 180ms ease;
+}
+.toggle-btn.active {
+  background: var(--ps-blue);
+  color: var(--ps-white);
+  box-shadow: rgba(0,0,0,0.10) 0 2px 6px 0;
+}
+.toggle-btn:not(.active):hover {
+  background: var(--ps-blue);
+  color: var(--ps-white);
+  transform: scale(1.04);
+}
+
+/* ── Iso render column ───────────────────────── */
+.g-iso {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.g2-img-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #1c1c1c;
+  box-shadow: rgba(0,0,0,0.12) 0 4px 12px 0;
+}
+.g2-img {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  object-fit: contain;
+  transition: opacity 220ms ease;
+}
+
+/* ── Right column: floor nav + 3D viewer ─────── */
+.g-right {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* floor buttons */
+.floor-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.floor-nav-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--ps-gray);
+  margin-bottom: 2px;
+}
+.floor-btn {
+  padding: 9px 16px;
+  border: 1.5px solid var(--ps-muted);
+  border-radius: 999px;
+  background: transparent;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  color: var(--ps-charcoal);
+  cursor: pointer;
+  transition: all 160ms ease;
+  text-align: left;
+}
+.floor-btn.active {
+  background: var(--ps-blue);
+  border-color: var(--ps-blue);
+  color: var(--ps-white);
+}
+.floor-btn:not(.active):hover {
+  background: var(--ps-blue);
+  border-color: var(--ps-blue);
+  color: var(--ps-white);
+  transform: scale(1.03);
+}
+
+/* inline 3D viewer */
+.viewer-frame-sm {
+  position: relative;
+  flex: 1;
+  min-height: 260px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #111;
+  border: 1px solid rgba(0,0,0,0.12);
+}
+.viewer-frame-sm model-viewer {
+  width: 100%;
+  height: 260px;
+  display: block;
+  --poster-color: #111111;
+}
+.viewer-status {
+  position: absolute;
+  left: 10px; bottom: 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.30);
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* ── Zoom result panel (Amazon-style) ────────── */
+.mag-zoom-panel {
+  position: fixed;
+  width: 280px;
+  height: 280px;
+  border-radius: 16px;
+  border: 1px solid rgba(0,0,0,0.10);
+  background-color: var(--ps-white);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+  pointer-events: none;
+  display: none;
+  background-repeat: no-repeat;
+  overflow: hidden;
+  z-index: 500;
+}
+
+/* ── Footer ──────────────────────────────────── */
+footer {
+  background: #0e0e0e;
+  color: var(--ps-white);
+  padding: 28px 0;
+  border-top: 1px solid rgba(255,255,255,0.07);
+}
+.footer-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.footer-left h2 {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+}
+.footer-left p {
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.40);
+  margin-top: 3px;
+}
+.footer-right {
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.35);
+  text-align: right;
+  line-height: 1.7;
+}
+
+/* ── Responsive ──────────────────────────────── */
+@media (max-width: 1100px) {
+  .container { width: 88%; }
+}
+@media (max-width: 900px) {
+  .nav { padding: 0 24px; }
+  .nav-links { display: none; }
+  .container { width: 94%; }
+  .sec-light { padding: 48px 0 72px; }
+  .sec-heading { font-size: 22px; }
+  .galleries-layout {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto auto;
+  }
+  .g-right {
+    grid-column: 1 / 3;
+    flex-direction: row;
+    align-items: flex-start;
+  }
+  .floor-nav { flex-direction: row; flex-wrap: wrap; flex: 0 0 auto; }
+  .viewer-frame-sm { min-height: 160px; }
+  .footer-inner { flex-direction: column; align-items: flex-start; gap: 16px; }
+  .footer-right { text-align: left; }
+}
+@media (max-width: 600px) {
+  .galleries-layout { grid-template-columns: 1fr; }
+  .g-right { flex-direction: column; grid-column: auto; }
+  .floor-nav { flex-direction: row; flex-wrap: wrap; }
+  .toggle-btn { padding: 8px 14px; }
+}
