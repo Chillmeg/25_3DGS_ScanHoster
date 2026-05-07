@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Baker House — 4.567</title>
   <link rel="stylesheet" href="style.css" />
-  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+  <script type="module" src="https://unpkg.com/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
 </head>
 <body>
 
@@ -74,6 +74,8 @@
                 touch-action="pan-y"
                 interaction-prompt="none"
                 shadow-intensity="1"
+                loading="eager"
+                reveal="auto"
               ></model-viewer>
               <div class="viewer-status" id="viewer-status">Loading model…</div>
             </div>
