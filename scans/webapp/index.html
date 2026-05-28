@@ -1,0 +1,1154 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Window View Analysis Tool</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        font-family:
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+        background: #111;
+        user-select: none;
+      }
+
+      /* ── Title bar ── */
+      #titleBar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 36px;
+        background: rgba(24, 24, 24, 0.94);
+        backdrop-filter: blur(6px);
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        gap: 10px;
+        z-index: 100;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      }
+      #titleBar .logo {
+        width: 22px;
+        height: 22px;
+        background: #4a9eff;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 800;
+        color: #fff;
+        flex-shrink: 0;
+      }
+      #titleBar .title {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.65);
+        white-space: nowrap;
+      }
+      #titleBar .title b {
+        color: rgba(255, 255, 255, 0.92);
+      }
+
+      /* ── Main canvas ── */
+      #mainCanvas {
+        position: absolute;
+        top: 36px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        cursor: grab;
+      }
+      #mainCanvas:active {
+        cursor: grabbing;
+      }
+
+      /* ── Panel shell ── */
+      .panel {
+        position: absolute;
+        background: rgba(251, 251, 251, 0.95);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(0, 0, 0, 0.09);
+        border-radius: 10px;
+        padding: 14px 15px;
+        box-shadow:
+          0 6px 30px rgba(0, 0, 0, 0.2),
+          0 1px 4px rgba(0, 0, 0, 0.1);
+        z-index: 10;
+      }
+      #leftPanel {
+        bottom: 24px;
+        left: 24px;
+        width: 252px;
+      }
+      #rightPanel {
+        bottom: 24px;
+        right: 24px;
+        width: 300px;
+      }
+
+      /* ── Section title ── */
+      .sec {
+        font-size: 9.5px;
+        font-weight: 700;
+        letter-spacing: 0.85px;
+        text-transform: uppercase;
+        color: #555;
+        margin-bottom: 9px;
+      }
+
+      /* ── Parameter rows ── */
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin-bottom: 6px;
+      }
+      .lbl {
+        font-size: 10.5px;
+        color: #777;
+        width: 60px;
+        flex-shrink: 0;
+      }
+      input[type="range"] {
+        flex: 1;
+        height: 3px;
+        min-width: 0;
+        accent-color: #333;
+        cursor: pointer;
+      }
+      .val {
+        font-size: 10.5px;
+        font-variant-numeric: tabular-nums;
+        color: #333;
+        width: 40px;
+        text-align: right;
+        flex-shrink: 0;
+      }
+      .divider {
+        border: none;
+        border-top: 1px solid #e6e6e6;
+        margin: 11px 0;
+      }
+
+      /* ── Window style grid ── */
+      .wgrid {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 4px;
+        margin-top: 6px;
+      }
+      .wbtn {
+        aspect-ratio: 1;
+        border: 1.5px solid #ccc;
+        border-radius: 5px;
+        background: #f5f5f5;
+        cursor: pointer;
+        padding: 3px;
+        overflow: hidden;
+        transition:
+          border-color 0.12s,
+          background 0.12s;
+      }
+      .wbtn canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      .wbtn.sel {
+        border-color: #222;
+        background: #222;
+      }
+      .wbtn:hover:not(.sel) {
+        border-color: #888;
+      }
+
+      /* ── Right-panel tabs ── */
+      .tabs {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 10px;
+      }
+      .tbtn {
+        flex: 1;
+        padding: 6px 4px;
+        font-size: 10.5px;
+        white-space: nowrap;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        cursor: pointer;
+        background: #f3f3f3;
+        color: #666;
+        transition: all 0.13s;
+      }
+      .tbtn.active {
+        background: #222;
+        color: #fff;
+        border-color: #222;
+      }
+
+      /* ── Layered diagram container ── */
+      #diagramWrap {
+        position: relative;
+        border-radius: 7px;
+        overflow: hidden;
+        height: 200px;
+        cursor: grab;
+        background: #edede9;
+      }
+      #diagramWrap:active {
+        cursor: grabbing;
+      }
+
+      /* Far-ring canvas sits behind Three.js */
+      #backBeltCanvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 1;
+      }
+
+      /* Three.js canvas in the middle */
+      #threeCanvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 2;
+      }
+
+      /* Near-ring + decorations canvas on top */
+      #beltCanvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 3;
+      }
+
+      /* Sun path image */
+      #sunImg {
+        width: 100%;
+        display: none;
+        border-radius: 7px;
+        border: 1px solid #e0e0e0;
+      }
+
+      /* ── Drag hint ── */
+      #hint {
+        position: absolute;
+        bottom: 216px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.4);
+        pointer-events: none;
+        z-index: 5;
+        transition: opacity 0.9s;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="titleBar">
+      <div class="logo">G</div>
+      <div class="title">
+        <b>View Analysis Web Tool</b>
+        &nbsp;—&nbsp;Version 1.0 &nbsp;|&nbsp;Liable Space Lab, MIT
+        &nbsp;|&nbsp;webapp developer: Qilmeg Doudatcz
+      </div>
+    </div>
+
+    <canvas id="mainCanvas"></canvas>
+    <div id="hint">← drag main view or diagram to rotate →</div>
+
+    <!-- ─── Left panel ─── -->
+    <div class="panel" id="leftPanel">
+      <div class="sec">Room Parameters</div>
+      <div class="row">
+        <span class="lbl">latitude</span>
+        <input
+          type="range"
+          id="sLat"
+          min="-90"
+          max="90"
+          step="0.01"
+          value="45.43"
+        />
+        <span class="val" id="vLat">45.43</span>
+      </div>
+      <div class="row">
+        <span class="lbl">longitude</span>
+        <input
+          type="range"
+          id="sLon"
+          min="-180"
+          max="180"
+          step="0.01"
+          value="12.33"
+        />
+        <span class="val" id="vLon">12.33</span>
+      </div>
+      <div class="row">
+        <span class="lbl">heading</span>
+        <input type="range" id="sHead" min="0" max="359" step="1" value="180" />
+        <span class="val" id="vHead">180°</span>
+      </div>
+
+      <hr class="divider" />
+      <div class="sec">Window Parameters</div>
+      <div class="row">
+        <span class="lbl">width</span>
+        <input
+          type="range"
+          id="sWW"
+          min="0.15"
+          max="0.95"
+          step="0.01"
+          value="0.50"
+        />
+        <span class="val" id="vWW">50%</span>
+      </div>
+      <div class="row">
+        <span class="lbl">height</span>
+        <input
+          type="range"
+          id="sWH"
+          min="0.10"
+          max="0.80"
+          step="0.01"
+          value="0.50"
+        />
+        <span class="val" id="vWH">50%</span>
+      </div>
+      <div
+        style="
+          font-size: 10.5px;
+          color: #888;
+          margin-top: 9px;
+          margin-bottom: 2px;
+        "
+      >
+        Window Style
+      </div>
+      <div class="wgrid" id="wgrid"></div>
+    </div>
+
+    <!-- ─── Right panel ─── -->
+    <div class="panel" id="rightPanel">
+      <div class="tabs">
+        <button class="tbtn active" id="tabV">View Path</button>
+        <button class="tbtn" id="tabS">Sun Path Diagram</button>
+      </div>
+
+      <!-- Layered diagram: back belt → Three.js (GLB) → front belt overlay -->
+      <div id="diagramWrap">
+        <canvas id="backBeltCanvas"></canvas>
+        <canvas id="threeCanvas"></canvas>
+        <canvas id="beltCanvas"></canvas>
+      </div>
+
+      <img
+        id="sunImg"
+        src="../window_view_demo/version3_pano/sun_path.png"
+        alt="Sun Path Diagram"
+      />
+    </div>
+
+    <!-- ─── Import map for Three.js ─── -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.163.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.163.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script type="module">
+      import * as THREE from "three";
+      import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+      ("use strict");
+
+      // ═══════════════════════════════════════════════════════════════
+      //  STATE
+      // ═══════════════════════════════════════════════════════════════
+      const S = {
+        heading: 180,
+        lat: 45.43,
+        lon: 12.33,
+        winW: 0.5,
+        winH: 0.5,
+        winType: 2,
+        tab: "view",
+      };
+
+      const STYLES = [
+        { v: 1, h: 0, dw: 0.7, dh: 0.2, dy: -0.15 },
+        { v: 1, h: 4, dw: 0.6, dh: 0.4, dy: 0.0 },
+        { v: 1, h: 1, dw: 0.5, dh: 0.5, dy: 0.0 },
+        { v: 1, h: 0, dw: 0.65, dh: 0.65, dy: 0.0 },
+        { v: 0, h: 4, dw: 0.22, dh: 0.72, dy: 0.0 },
+        { v: 0, h: 0, dw: 0.9, dh: 0.28, dy: -0.1 },
+      ];
+
+      // ═══════════════════════════════════════════════════════════════
+      //  PANORAMA IMAGE
+      // ═══════════════════════════════════════════════════════════════
+      const IMG = { pano: null };
+      const panoEl = new Image();
+      panoEl.onload = () => {
+        IMG.pano = panoEl;
+        scheduleRender();
+      };
+      panoEl.onerror = () => scheduleRender();
+      panoEl.src = "../window_view_demo/panorama/strip.png";
+
+      // ═══════════════════════════════════════════════════════════════
+      //  MAIN CANVAS — 2-D ROOM VIEW
+      // ═══════════════════════════════════════════════════════════════
+      const MC = document.getElementById("mainCanvas");
+      const ctx = MC.getContext("2d");
+
+      function resizeMC() {
+        MC.width = window.innerWidth;
+        MC.height = window.innerHeight - 36;
+      }
+      resizeMC();
+      window.addEventListener("resize", () => {
+        resizeMC();
+        scheduleRender();
+      });
+
+      function drawRoom() {
+        const W = MC.width,
+          H = MC.height;
+        ctx.clearRect(0, 0, W, H);
+
+        const BX1 = W * 0.26,
+          BX2 = W * 0.74;
+        const BY1 = H * 0.07,
+          BY2 = H * 0.88;
+        const BW = BX2 - BX1,
+          BH = BY2 - BY1;
+
+        // Ceiling
+        ctx.fillStyle = "#e5e5e5";
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(W, 0);
+        ctx.lineTo(BX2, BY1);
+        ctx.lineTo(BX1, BY1);
+        ctx.closePath();
+        ctx.fill();
+
+        // Floor
+        ctx.fillStyle = "#c8b89e";
+        ctx.beginPath();
+        ctx.moveTo(0, H);
+        ctx.lineTo(W, H);
+        ctx.lineTo(BX2, BY2);
+        ctx.lineTo(BX1, BY2);
+        ctx.closePath();
+        ctx.fill();
+
+        // Left wall
+        ctx.fillStyle = "#d5d5d5";
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(BX1, BY1);
+        ctx.lineTo(BX1, BY2);
+        ctx.lineTo(0, H);
+        ctx.closePath();
+        ctx.fill();
+
+        // Right wall
+        ctx.fillStyle = "#c7c7c7";
+        ctx.beginPath();
+        ctx.moveTo(W, 0);
+        ctx.lineTo(BX2, BY1);
+        ctx.lineTo(BX2, BY2);
+        ctx.lineTo(W, H);
+        ctx.closePath();
+        ctx.fill();
+
+        // Back wall
+        ctx.fillStyle = "#d9d9d9";
+        ctx.fillRect(BX1, BY1, BW, BH);
+
+        // Window geometry
+        const ws = STYLES[S.winType];
+        const wW = S.winW * BW,
+          wH = S.winH * BH;
+        const wX = BX1 + (BW - wW) / 2;
+        const wY = BY1 + (BH - wH) / 2 + ws.dy * BH;
+
+        drawPano(wX, wY, wW, wH);
+        drawFrame(wX, wY, wW, wH, ws);
+        drawEdgeShadows(W, H, BX1, BY1, BX2, BY2);
+      }
+
+      // ── Panorama with correct (non-stretched) projection ─────────
+      function drawPano(wx, wy, ww, wh) {
+        if (!IMG.pano) {
+          ctx.fillStyle = "#87ceeb";
+          ctx.fillRect(wx, wy, ww, wh);
+          return;
+        }
+        const P = IMG.pano;
+        const fovDeg = Math.max(5, S.winW * 100);
+        const srcW = (fovDeg / 360) * P.width;
+        const scale = ww / srcW; // screen-px per panorama-px (horizontal)
+        const srcH_needed = wh / scale; // panorama-px needed to fill window height at same scale
+        const pCenter = P.height / 2; // horizon at mid-strip
+
+        let srcY, srcH, destY, destH;
+        if (srcH_needed <= P.height) {
+          srcY = pCenter - srcH_needed / 2;
+          srcH = srcH_needed;
+          destY = wy;
+          destH = wh;
+        } else {
+          // Panorama not tall enough: pad with sky/ground
+          srcY = 0;
+          srcH = P.height;
+          destH = P.height * scale;
+          destY = wy + (wh - destH) / 2;
+          // Sky above
+          if (destY > wy) {
+            const sg = ctx.createLinearGradient(wx, wy, wx, destY);
+            sg.addColorStop(0, "#9ad0e8");
+            sg.addColorStop(1, "#c8e8f4");
+            ctx.fillStyle = sg;
+            ctx.fillRect(wx, wy, ww, destY - wy);
+          }
+          // Ground below
+          if (destY + destH < wy + wh) {
+            ctx.fillStyle = "#9a8a6a";
+            ctx.fillRect(wx, destY + destH, ww, wy + wh - destY - destH);
+          }
+        }
+
+        const centerPX = (S.heading / 360) * P.width;
+        const srcX0 = centerPX - srcW / 2;
+        const nsx = ((srcX0 % P.width) + P.width) % P.width;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(wx, wy, ww, wh);
+        ctx.clip();
+
+        if (nsx + srcW <= P.width) {
+          ctx.drawImage(P, nsx, srcY, srcW, srcH, wx, destY, ww, destH);
+        } else {
+          const part1 = P.width - nsx,
+            sw1 = (part1 / srcW) * ww;
+          ctx.drawImage(P, nsx, srcY, part1, srcH, wx, destY, sw1, destH);
+          ctx.drawImage(
+            P,
+            0,
+            srcY,
+            srcW - part1,
+            srcH,
+            wx + sw1,
+            destY,
+            ww - sw1,
+            destH,
+          );
+        }
+        ctx.restore();
+      }
+
+      // ── Window frame ─────────────────────────────────────────────
+      function drawFrame(wx, wy, ww, wh, ws) {
+        const FW = 7,
+          MW = 4,
+          RD = 13,
+          fc = "#f0f0f0";
+
+        ctx.fillStyle = "#bfbfbf";
+        ctx.beginPath();
+        ctx.moveTo(wx, wy);
+        ctx.lineTo(wx + ww, wy);
+        ctx.lineTo(wx + ww + RD, wy - RD);
+        ctx.lineTo(wx - RD, wy - RD);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = "#c8c8c8";
+        ctx.beginPath();
+        ctx.moveTo(wx, wy);
+        ctx.lineTo(wx, wy + wh);
+        ctx.lineTo(wx - RD, wy + wh + RD);
+        ctx.lineTo(wx - RD, wy - RD);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = "#b0b0b0";
+        ctx.beginPath();
+        ctx.moveTo(wx, wy + wh);
+        ctx.lineTo(wx + ww, wy + wh);
+        ctx.lineTo(wx + ww + RD, wy + wh + RD);
+        ctx.lineTo(wx - RD, wy + wh + RD);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = "#c0c0c0";
+        ctx.beginPath();
+        ctx.moveTo(wx + ww, wy);
+        ctx.lineTo(wx + ww, wy + wh);
+        ctx.lineTo(wx + ww + RD, wy + wh + RD);
+        ctx.lineTo(wx + ww + RD, wy - RD);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = fc;
+        ctx.fillRect(wx - FW, wy - FW, ww + FW * 2, FW);
+        ctx.fillRect(wx - FW, wy + wh, ww + FW * 2, FW);
+        ctx.fillRect(wx - FW, wy, FW, wh);
+        ctx.fillRect(wx + ww, wy, FW, wh);
+
+        ctx.fillStyle = fc;
+        for (let v = 1; v <= ws.v; v++) {
+          const mx = wx + (ww / (ws.v + 1)) * v;
+          ctx.fillRect(mx - MW / 2, wy, MW, wh);
+        }
+        for (let h = 1; h <= ws.h; h++) {
+          const my = wy + (wh / (ws.h + 1)) * h;
+          ctx.fillRect(wx, my - MW / 2, ww, MW);
+        }
+
+        ctx.strokeStyle = "rgba(0,0,0,0.15)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(wx, wy, ww, wh);
+      }
+
+      function drawEdgeShadows(W, H, bx1, by1, bx2, by2) {
+        [
+          [0, 0, bx1, by1],
+          [W, 0, bx2, by1],
+          [0, H, bx1, by2],
+          [W, H, bx2, by2],
+        ].forEach(([x0, y0, x1, y1]) => {
+          const g = ctx.createLinearGradient(x0, y0, x1, y1);
+          g.addColorStop(0, "rgba(0,0,0,0.16)");
+          g.addColorStop(1, "rgba(0,0,0,0)");
+          ctx.fillStyle = g;
+          ctx.fillRect(0, 0, W, H);
+        });
+      }
+
+      let rafId = null;
+      function scheduleRender() {
+        if (rafId) return;
+        rafId = requestAnimationFrame(() => {
+          rafId = null;
+          drawRoom();
+        });
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      //  THREE.JS — GLB MODEL
+      // ═══════════════════════════════════════════════════════════════
+      const diagramWrap = document.getElementById("diagramWrap");
+      const threeCanvas = document.getElementById("threeCanvas");
+      const beltCanvas = document.getElementById("beltCanvas");
+      const backBeltCanvas = document.getElementById("backBeltCanvas");
+      const bctx = beltCanvas.getContext("2d");
+      const bkctx = backBeltCanvas.getContext("2d");
+
+      const renderer = new THREE.WebGLRenderer({
+        canvas: threeCanvas,
+        antialias: true,
+        alpha: true,
+      });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+      const scene = new THREE.Scene();
+
+      const camera = new THREE.PerspectiveCamera(38, 1, 0.01, 100);
+      camera.position.set(2.6, 2.0, 3.4);
+      camera.lookAt(0, 0.05, 0);
+
+      scene.add(new THREE.AmbientLight(0xffffff, 1.3));
+      const sun = new THREE.DirectionalLight(0xfff8ee, 1.4);
+      sun.position.set(4, 6, 5);
+      scene.add(sun);
+      const fill = new THREE.DirectionalLight(0xdde8ff, 0.5);
+      fill.position.set(-3, 2, -4);
+      scene.add(fill);
+
+      const pivot = new THREE.Group();
+      scene.add(pivot);
+
+      let modelHeadingRad = -((S.heading * Math.PI) / 180);
+      let roomModel = null;
+
+      const loader = new GLTFLoader();
+      loader.load(
+        "./room.glb",
+        (gltf) => {
+          const m = gltf.scene;
+          const box = new THREE.Box3().setFromObject(m);
+          const size = box.getSize(new THREE.Vector3());
+          const ctr = box.getCenter(new THREE.Vector3());
+          m.position.sub(ctr);
+          m.scale.setScalar(1.0 / Math.max(size.x, size.y, size.z));
+          pivot.add(m);
+          roomModel = m;
+        },
+        undefined,
+        (err) => console.warn("GLB error:", err),
+      );
+
+      function resizeThree() {
+        const W = diagramWrap.clientWidth;
+        const H = diagramWrap.clientHeight;
+        if (!W || !H) return;
+        camera.aspect = W / H;
+        camera.updateProjectionMatrix();
+        renderer.setSize(W, H, false);
+        beltCanvas.width = W;
+        beltCanvas.height = H;
+        backBeltCanvas.width = W;
+        backBeltCanvas.height = H;
+      }
+      resizeThree();
+      window.addEventListener("resize", resizeThree);
+
+      // ─── Three.js animation loop ──────────────────────────────────
+      function threeLoop() {
+        requestAnimationFrame(threeLoop);
+
+        // Smoothly lerp model rotation toward S.heading
+        const target = -((S.heading * Math.PI) / 180);
+        let diff = target - modelHeadingRad;
+        while (diff > Math.PI) diff -= 2 * Math.PI;
+        while (diff < -Math.PI) diff += 2 * Math.PI;
+        modelHeadingRad += diff * 0.09;
+        pivot.rotation.y = modelHeadingRad;
+
+        if (S.tab === "view") {
+          renderer.render(scene, camera);
+          drawBelt();
+        }
+      }
+      threeLoop();
+
+      // ═══════════════════════════════════════════════════════════════
+      //  BELT DIAGRAM — 2-D OVERLAY on top of Three.js
+      //
+      //  Two-layer approach:
+      //   • Three.js renders the GLB room model (full canvas)
+      //   • beltCanvas draws the panorama ring on top; the center is
+      //     left transparent so the GLB model shows through
+      // ═══════════════════════════════════════════════════════════════
+      function drawBelt() {
+        const W = beltCanvas.width,
+          H = beltCanvas.height;
+        if (!W || !H) return;
+        bctx.clearRect(0, 0, W, H);
+
+        const cx = W * 0.5;
+        const cy = H * 0.58;
+        const rx = W * 0.44; // outer horizontal radius
+        const ry = H * 0.3; // outer vertical radius (perspective squash)
+        const innerScale = 0.72; // inner / outer — transparent center shows GLB
+        const yScale = ry / rx;
+
+        const fovDeg = Math.max(5, S.winW * 100);
+        const fovRad = (fovDeg * Math.PI) / 180;
+        const headA = (S.heading / 360) * 2 * Math.PI - Math.PI / 2;
+
+        // ── Belt ring: far half (pass 0) then near half (pass 1) ──
+        const N = 180;
+        for (let pass = 0; pass < 2; pass++) {
+          for (let i = 0; i < N; i++) {
+            const a = (i / N) * 2 * Math.PI - Math.PI / 2;
+            const a2 = ((i + 1) / N) * 2 * Math.PI - Math.PI / 2;
+            const isTop = cy + Math.sin(a) * ry < cy;
+            if (pass === 0 && !isTop) continue;
+            if (pass === 1 && isTop) continue;
+
+            const ox1 = cx + Math.cos(a) * rx,
+              oy1 = cy + Math.sin(a) * ry;
+            const ox2 = cx + Math.cos(a2) * rx,
+              oy2 = cy + Math.sin(a2) * ry;
+            const ix1 = cx + Math.cos(a) * rx * innerScale;
+            const iy1 = cy + Math.sin(a) * ry * innerScale;
+            const ix2 = cx + Math.cos(a2) * rx * innerScale;
+            const iy2 = cy + Math.sin(a2) * ry * innerScale;
+
+            // Heading this segment represents
+            const segH =
+              (((a + Math.PI / 2) / (2 * Math.PI)) * 360 + 360) % 360;
+            let dh = segH - S.heading;
+            if (dh > 180) dh -= 360;
+            if (dh < -180) dh += 360;
+            const inView = Math.abs(dh) < fovDeg / 2;
+
+            bctx.save();
+            bctx.beginPath();
+            bctx.moveTo(ox1, oy1);
+            bctx.lineTo(ox2, oy2);
+            bctx.lineTo(ix2, iy2);
+            bctx.lineTo(ix1, iy1);
+            bctx.closePath();
+            bctx.clip();
+
+            const mnX = Math.min(ox1, ox2, ix1, ix2) - 1,
+              mxX = Math.max(ox1, ox2, ix1, ix2) + 1;
+            const mnY = Math.min(oy1, oy2, iy1, iy2) - 1,
+              mxY = Math.max(oy1, oy2, iy1, iy2) + 1;
+
+            if (IMG.pano) {
+              const P = IMG.pano;
+              const px = ((segH / 360) * P.width + P.width) % P.width;
+              bctx.drawImage(
+                P,
+                px,
+                0,
+                P.width / N,
+                P.height,
+                mnX,
+                mnY,
+                mxX - mnX,
+                mxY - mnY,
+              );
+            } else {
+              bctx.fillStyle = "#bbb";
+              bctx.fillRect(mnX, mnY, mxX - mnX, mxY - mnY);
+            }
+
+            // Dim non-selected; keep selected bright
+            if (!inView) {
+              bctx.fillStyle =
+                pass === 0
+                  ? "rgba(200,200,200,0.62)"
+                  : "rgba(200,200,200,0.48)";
+              bctx.fillRect(mnX, mnY, mxX - mnX, mxY - mnY);
+            }
+            bctx.restore();
+
+            // Segment seam
+            bctx.strokeStyle = "rgba(0,0,0,0.03)";
+            bctx.lineWidth = 0.4;
+            bctx.beginPath();
+            bctx.moveTo(ox1, oy1);
+            bctx.lineTo(ox2, oy2);
+            bctx.lineTo(ix2, iy2);
+            bctx.lineTo(ix1, iy1);
+            bctx.closePath();
+            bctx.stroke();
+          }
+        }
+
+        // ── FOV highlight arc ──
+        bctx.setLineDash([]);
+        bctx.strokeStyle = "rgba(230,170,18,0.95)";
+        bctx.lineWidth = 2.5;
+        bctx.beginPath();
+        bctx.ellipse(cx, cy, rx, ry, 0, headA - fovRad / 2, headA + fovRad / 2);
+        bctx.stroke();
+        // Inner edge of highlighted arc
+        bctx.strokeStyle = "rgba(230,170,18,0.45)";
+        bctx.lineWidth = 1;
+        bctx.beginPath();
+        bctx.ellipse(
+          cx,
+          cy,
+          rx * innerScale,
+          ry * innerScale,
+          0,
+          headA - fovRad / 2,
+          headA + fovRad / 2,
+        );
+        bctx.stroke();
+
+        // ── Arc endpoint dots ──
+        const arcLX = cx + Math.cos(headA - fovRad / 2) * rx;
+        const arcLY = cy + Math.sin(headA - fovRad / 2) * ry;
+        const arcRX = cx + Math.cos(headA + fovRad / 2) * rx;
+        const arcRY = cy + Math.sin(headA + fovRad / 2) * ry;
+
+        [arcLX, arcRX].forEach((x, i) => {
+          const y = i === 0 ? arcLY : arcRY;
+          bctx.fillStyle = "rgba(230,170,18,0.9)";
+          bctx.beginPath();
+          bctx.arc(x, y, 4, 0, Math.PI * 2);
+          bctx.fill();
+        });
+
+        // ══ SIGHT / PROJECTION LINES ═════════════════════════════
+        // The window is placed on the model face, at a small offset
+        // from center in the heading direction. Two dashed lines run
+        // from the window's left/right corners to the FOV arc endpoints.
+        // This visualises the window-as-projector concept.
+
+        // "Window" position relative to diagram center
+        const wOffset = rx * innerScale * 0.46; // depth of window from center
+        const wHalfW = Math.tan(fovRad / 2) * wOffset; // half-width at that depth
+        const perpA = headA + Math.PI / 2;
+
+        // Apex (window centre)
+        const apexX = cx + Math.cos(headA) * wOffset;
+        const apexY = cy + Math.sin(headA) * wOffset * yScale;
+
+        // Left and right window corners (accounting for ellipse y-squash)
+        const wLX = apexX + Math.cos(perpA) * wHalfW;
+        const wLY = apexY + Math.sin(perpA) * wHalfW * yScale;
+        const wRX = apexX - Math.cos(perpA) * wHalfW;
+        const wRY = apexY - Math.sin(perpA) * wHalfW * yScale;
+
+        // Dashed lines: window corners → FOV arc endpoints
+        bctx.setLineDash([4, 4]);
+        bctx.lineWidth = 1.4;
+        bctx.strokeStyle = "rgba(50, 80, 220, 0.72)";
+
+        bctx.beginPath();
+        bctx.moveTo(wLX, wLY);
+        bctx.lineTo(arcLX, arcLY);
+        bctx.stroke();
+        bctx.beginPath();
+        bctx.moveTo(wRX, wRY);
+        bctx.lineTo(arcRX, arcRY);
+        bctx.stroke();
+
+        bctx.setLineDash([]);
+
+        // Window marker: a short line segment across heading direction
+        // (represents the window aperture in top-down view)
+        bctx.lineWidth = 2.5;
+        bctx.strokeStyle = "rgba(255,255,255,0.95)";
+        bctx.beginPath();
+        bctx.moveTo(wLX, wLY);
+        bctx.lineTo(wRX, wRY);
+        bctx.stroke();
+        bctx.lineWidth = 1.5;
+        bctx.strokeStyle = "rgba(50, 80, 220, 0.85)";
+        bctx.beginPath();
+        bctx.moveTo(wLX, wLY);
+        bctx.lineTo(wRX, wRY);
+        bctx.stroke();
+
+        // Small dot at window centre (apex)
+        bctx.fillStyle = "rgba(50, 80, 220, 0.85)";
+        bctx.beginPath();
+        bctx.arc(apexX, apexY, 2.5, 0, Math.PI * 2);
+        bctx.fill();
+
+        // ── Heading dot on outer belt ──
+        const hdotX = cx + Math.cos(headA) * rx;
+        const hdotY = cy + Math.sin(headA) * ry;
+        bctx.fillStyle = "#222";
+        bctx.beginPath();
+        bctx.arc(hdotX, hdotY, 4, 0, Math.PI * 2);
+        bctx.fill();
+        bctx.strokeStyle = "#fff";
+        bctx.lineWidth = 1.5;
+        bctx.stroke();
+
+        // ── Compass labels ──
+        bctx.font = "bold 9px system-ui";
+        bctx.textAlign = "center";
+        bctx.textBaseline = "middle";
+        [
+          ["N", -Math.PI / 2],
+          ["E", 0],
+          ["S", Math.PI / 2],
+          ["W", Math.PI],
+        ].forEach(([l, a]) => {
+          bctx.fillStyle = "#666";
+          bctx.fillText(
+            l,
+            cx + Math.cos(a) * (rx + 13),
+            cy + Math.sin(a) * (ry + 9),
+          );
+        });
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      //  DRAG — main canvas + diagram wrap
+      // ═══════════════════════════════════════════════════════════════
+      function makeDraggable(el, onDelta) {
+        let active = false,
+          lastX = 0;
+        const dn = (x) => {
+          active = true;
+          lastX = x;
+        };
+        const mv = (x) => {
+          if (!active) return;
+          onDelta(x - lastX);
+          lastX = x;
+        };
+        const up = () => {
+          active = false;
+        };
+        el.addEventListener("mousedown", (e) => dn(e.clientX));
+        el.addEventListener(
+          "touchstart",
+          (e) => {
+            e.preventDefault();
+            dn(e.touches[0].clientX);
+          },
+          { passive: false },
+        );
+        window.addEventListener("mousemove", (e) => mv(e.clientX));
+        window.addEventListener(
+          "touchmove",
+          (e) => {
+            e.preventDefault();
+            mv(e.touches[0].clientX);
+          },
+          { passive: false },
+        );
+        window.addEventListener("mouseup", up);
+        window.addEventListener("touchend", up);
+      }
+
+      makeDraggable(MC, (dx) => {
+        S.heading = (S.heading + dx * 0.18 + 360) % 360;
+        syncHeadingUI();
+        scheduleRender();
+        dismissHint();
+      });
+
+      makeDraggable(diagramWrap, (dx) => {
+        S.heading = (S.heading + dx * 0.9 + 360) % 360;
+        syncHeadingUI();
+        scheduleRender();
+      });
+
+      // ═══════════════════════════════════════════════════════════════
+      //  SLIDERS
+      // ═══════════════════════════════════════════════════════════════
+      function syncHeadingUI() {
+        document.getElementById("sHead").value = S.heading;
+        document.getElementById("vHead").textContent =
+          Math.round(S.heading) + "°";
+      }
+
+      function bindSlider(id, vid, key, fmt) {
+        const sl = document.getElementById(id);
+        const vl = document.getElementById(vid);
+        sl.addEventListener("input", () => {
+          S[key] = parseFloat(sl.value);
+          vl.textContent = fmt(S[key]);
+          scheduleRender();
+        });
+      }
+      bindSlider("sLat", "vLat", "lat", (v) => v.toFixed(2));
+      bindSlider("sLon", "vLon", "lon", (v) => v.toFixed(2));
+      bindSlider("sHead", "vHead", "heading", (v) => Math.round(v) + "°");
+      bindSlider("sWW", "vWW", "winW", (v) => Math.round(v * 100) + "%");
+      bindSlider("sWH", "vWH", "winH", (v) => Math.round(v * 100) + "%");
+
+      // ═══════════════════════════════════════════════════════════════
+      //  WINDOW STYLE BUTTONS
+      // ═══════════════════════════════════════════════════════════════
+      function makeIcon(ws, sel) {
+        const ic = document.createElement("canvas");
+        ic.width = ic.height = 34;
+        const c = ic.getContext("2d");
+        c.fillStyle = sel ? "#555" : "#ddd";
+        c.fillRect(0, 0, 34, 34);
+        const pw = Math.round(ws.dw * 28),
+          ph = Math.round(ws.dh * 28);
+        const px = (34 - pw) / 2,
+          py = (34 - ph) / 2 + ws.dy * 28;
+        c.fillStyle = sel ? "rgba(255,255,255,0.18)" : "#f0f0f0";
+        c.fillRect(px, py, pw, ph);
+        c.fillStyle = sel ? "rgba(255,255,255,0.85)" : "#c8c8c8";
+        for (let v = 1; v <= ws.v; v++) {
+          const mx = px + (pw / (ws.v + 1)) * v;
+          c.fillRect(mx - 1, py, 2, ph);
+        }
+        for (let h = 1; h <= ws.h; h++) {
+          const my = py + (ph / (ws.h + 1)) * h;
+          c.fillRect(px, my - 1, pw, 2);
+        }
+        return ic;
+      }
+
+      const wgrid = document.getElementById("wgrid");
+      STYLES.forEach((ws, i) => {
+        const btn = document.createElement("button");
+        btn.className = "wbtn" + (i === S.winType ? " sel" : "");
+        btn.title = `Style ${i + 1}`;
+        btn.appendChild(makeIcon(ws, i === S.winType));
+        btn.addEventListener("click", () => {
+          S.winType = i;
+          S.winW = ws.dw;
+          S.winH = ws.dh;
+          document.getElementById("sWW").value = ws.dw;
+          document.getElementById("sWH").value = ws.dh;
+          document.getElementById("vWW").textContent =
+            Math.round(ws.dw * 100) + "%";
+          document.getElementById("vWH").textContent =
+            Math.round(ws.dh * 100) + "%";
+          wgrid.querySelectorAll(".wbtn").forEach((b, j) => {
+            b.classList.toggle("sel", j === i);
+            b.innerHTML = "";
+            b.appendChild(makeIcon(STYLES[j], j === i));
+          });
+          scheduleRender();
+        });
+        wgrid.appendChild(btn);
+      });
+
+      // ═══════════════════════════════════════════════════════════════
+      //  TABS
+      // ═══════════════════════════════════════════════════════════════
+      document.getElementById("tabV").addEventListener("click", () => {
+        S.tab = "view";
+        document.getElementById("tabV").classList.add("active");
+        document.getElementById("tabS").classList.remove("active");
+        document.getElementById("diagramWrap").style.display = "block";
+        document.getElementById("sunImg").style.display = "none";
+      });
+      document.getElementById("tabS").addEventListener("click", () => {
+        S.tab = "sun";
+        document.getElementById("tabS").classList.add("active");
+        document.getElementById("tabV").classList.remove("active");
+        document.getElementById("diagramWrap").style.display = "none";
+        document.getElementById("sunImg").style.display = "block";
+        bctx.clearRect(0, 0, beltCanvas.width, beltCanvas.height);
+      });
+
+      // ═══════════════════════════════════════════════════════════════
+      //  DRAG HINT
+      // ═══════════════════════════════════════════════════════════════
+      let hintGone = false;
+      function dismissHint() {
+        if (hintGone) return;
+        hintGone = true;
+        const h = document.getElementById("hint");
+        h.style.opacity = "0";
+        setTimeout(() => h.remove(), 950);
+      }
+
+      // ─── Init ────────────────────────────────────────────────────
+      scheduleRender();
+    </script>
+  </body>
+</html>
