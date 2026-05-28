@@ -754,51 +754,96 @@
       }
       threeLoop();
 
+      // ─── 3-D math helpers for perspective projection ──────────────
+      function norm3(v) {
+        const l = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+        return [v[0] / l, v[1] / l, v[2] / l];
+      }
+      function cross3(a, b) {
+        return [
+          a[1] * b[2] - a[2] * b[1],
+          a[2] * b[0] - a[0] * b[2],
+          a[0] * b[1] - a[1] * b[0],
+        ];
+      }
+      function dot3(a, b) {
+        return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+      }
+
+      // Returns a project(x,y,z) → [px,py] function matching Three.js camera
+      function makeProj(W, H) {
+        const EYE = [2.6, 2.0, 3.4],
+          TARGET = [0, 0.05, 0];
+        const fov = (38 * Math.PI) / 180;
+        const tanH = Math.tan(fov / 2),
+          aspect = W / H;
+        const fwd = norm3([
+          TARGET[0] - EYE[0],
+          TARGET[1] - EYE[1],
+          TARGET[2] - EYE[2],
+        ]);
+        const right = norm3(cross3(fwd, [0, 1, 0]));
+        const up = cross3(right, fwd);
+        return function (x, y, z) {
+          const d = [x - EYE[0], y - EYE[1], z - EYE[2]];
+          const pcx = dot3(d, right),
+            pcy = dot3(d, up),
+            cz = dot3(d, fwd);
+          if (cz <= 0) return null;
+          return [
+            (pcx / (cz * aspect * tanH) + 1) * 0.5 * W,
+            (1 - pcy / (cz * tanH)) * 0.5 * H,
+          ];
+        };
+      }
+
       // ═══════════════════════════════════════════════════════════════
-      //  BELT DIAGRAM — 2-D OVERLAY on top of Three.js
-      //
-      //  Two-layer approach:
-      //   • Three.js renders the GLB room model (full canvas)
-      //   • beltCanvas draws the panorama ring on top; the center is
-      //     left transparent so the GLB model shows through
+      //  BELT DIAGRAM — perspective-matched cylinder around GLB
       // ═══════════════════════════════════════════════════════════════
       function drawBelt() {
         const W = beltCanvas.width,
           H = beltCanvas.height;
         if (!W || !H) return;
+        bkctx.clearRect(0, 0, W, H);
         bctx.clearRect(0, 0, W, H);
 
-        const cx = W * 0.5;
-        const cy = H * 0.58;
-        const rx = W * 0.44; // outer horizontal radius
-        const ry = H * 0.3; // outer vertical radius (perspective squash)
-        const innerScale = 0.72; // inner / outer — transparent center shows GLB
-        const yScale = ry / rx;
+        const proj = makeProj(W, H);
+
+        // Cylinder dimensions in Three.js world units
+        const CYL_R = 1.5,
+          CYL_Y_B = 0.0,
+          CYL_Y_T = 0.45;
+
+        // Camera horizontal direction for near/far split (ignore Y)
+        const camL = Math.sqrt(2.6 * 2.6 + 3.4 * 3.4);
+        const camHX = 2.6 / camL,
+          camHZ = 3.4 / camL;
 
         const fovDeg = Math.max(5, S.winW * 100);
         const fovRad = (fovDeg * Math.PI) / 180;
         const headA = (S.heading / 360) * 2 * Math.PI - Math.PI / 2;
 
-        // ── Belt ring: far half (pass 0) then near half (pass 1) ──
+        // ── Cylinder segments: far (pass 0 → bkctx) and near (pass 1 → bctx) ──
         const N = 180;
         for (let pass = 0; pass < 2; pass++) {
+          const dc = pass === 0 ? bkctx : bctx;
           for (let i = 0; i < N; i++) {
             const a = (i / N) * 2 * Math.PI - Math.PI / 2;
             const a2 = ((i + 1) / N) * 2 * Math.PI - Math.PI / 2;
-            const isTop = cy + Math.sin(a) * ry < cy;
-            if (pass === 0 && !isTop) continue;
-            if (pass === 1 && isTop) continue;
+            const isFar = camHX * Math.cos(a) + camHZ * Math.sin(a) < 0;
+            if (pass === 0 && !isFar) continue;
+            if (pass === 1 && isFar) continue;
 
-            const ox1 = cx + Math.cos(a) * rx,
-              oy1 = cy + Math.sin(a) * ry;
-            const ox2 = cx + Math.cos(a2) * rx,
-              oy2 = cy + Math.sin(a2) * ry;
-            const ix1 = cx + Math.cos(a) * rx * innerScale;
-            const iy1 = cy + Math.sin(a) * ry * innerScale;
-            const ix2 = cx + Math.cos(a2) * rx * innerScale;
-            const iy2 = cy + Math.sin(a2) * ry * innerScale;
+            const x1 = CYL_R * Math.cos(a),
+              z1 = CYL_R * Math.sin(a);
+            const x2 = CYL_R * Math.cos(a2),
+              z2 = CYL_R * Math.sin(a2);
+            const pb1 = proj(x1, CYL_Y_B, z1),
+              pb2 = proj(x2, CYL_Y_B, z2);
+            const pt1 = proj(x1, CYL_Y_T, z1),
+              pt2 = proj(x2, CYL_Y_T, z2);
+            if (!pb1 || !pb2 || !pt1 || !pt2) continue;
 
-            // Heading this segment represents
             const segH =
               (((a + Math.PI / 2) / (2 * Math.PI)) * 360 + 360) % 360;
             let dh = segH - S.heading;
@@ -806,24 +851,24 @@
             if (dh < -180) dh += 360;
             const inView = Math.abs(dh) < fovDeg / 2;
 
-            bctx.save();
-            bctx.beginPath();
-            bctx.moveTo(ox1, oy1);
-            bctx.lineTo(ox2, oy2);
-            bctx.lineTo(ix2, iy2);
-            bctx.lineTo(ix1, iy1);
-            bctx.closePath();
-            bctx.clip();
+            dc.save();
+            dc.beginPath();
+            dc.moveTo(pb1[0], pb1[1]);
+            dc.lineTo(pb2[0], pb2[1]);
+            dc.lineTo(pt2[0], pt2[1]);
+            dc.lineTo(pt1[0], pt1[1]);
+            dc.closePath();
+            dc.clip();
 
-            const mnX = Math.min(ox1, ox2, ix1, ix2) - 1,
-              mxX = Math.max(ox1, ox2, ix1, ix2) + 1;
-            const mnY = Math.min(oy1, oy2, iy1, iy2) - 1,
-              mxY = Math.max(oy1, oy2, iy1, iy2) + 1;
+            const mnX = Math.min(pb1[0], pb2[0], pt1[0], pt2[0]) - 1;
+            const mxX = Math.max(pb1[0], pb2[0], pt1[0], pt2[0]) + 1;
+            const mnY = Math.min(pb1[1], pb2[1], pt1[1], pt2[1]) - 1;
+            const mxY = Math.max(pb1[1], pb2[1], pt1[1], pt2[1]) + 1;
 
             if (IMG.pano) {
               const P = IMG.pano;
               const px = ((segH / 360) * P.width + P.width) % P.width;
-              bctx.drawImage(
+              dc.drawImage(
                 P,
                 px,
                 0,
@@ -835,154 +880,144 @@
                 mxY - mnY,
               );
             } else {
-              bctx.fillStyle = "#bbb";
-              bctx.fillRect(mnX, mnY, mxX - mnX, mxY - mnY);
+              dc.fillStyle = "#bbb";
+              dc.fillRect(mnX, mnY, mxX - mnX, mxY - mnY);
             }
-
-            // Dim non-selected; keep selected bright
             if (!inView) {
-              bctx.fillStyle =
-                pass === 0
-                  ? "rgba(200,200,200,0.62)"
-                  : "rgba(200,200,200,0.48)";
-              bctx.fillRect(mnX, mnY, mxX - mnX, mxY - mnY);
+              dc.fillStyle = isFar
+                ? "rgba(200,200,200,0.62)"
+                : "rgba(200,200,200,0.48)";
+              dc.fillRect(mnX, mnY, mxX - mnX, mxY - mnY);
             }
-            bctx.restore();
+            dc.restore();
 
-            // Segment seam
-            bctx.strokeStyle = "rgba(0,0,0,0.03)";
-            bctx.lineWidth = 0.4;
-            bctx.beginPath();
-            bctx.moveTo(ox1, oy1);
-            bctx.lineTo(ox2, oy2);
-            bctx.lineTo(ix2, iy2);
-            bctx.lineTo(ix1, iy1);
-            bctx.closePath();
-            bctx.stroke();
+            dc.strokeStyle = "rgba(0,0,0,0.03)";
+            dc.lineWidth = 0.4;
+            dc.beginPath();
+            dc.moveTo(pb1[0], pb1[1]);
+            dc.lineTo(pb2[0], pb2[1]);
+            dc.lineTo(pt2[0], pt2[1]);
+            dc.lineTo(pt1[0], pt1[1]);
+            dc.closePath();
+            dc.stroke();
           }
         }
 
-        // ── FOV highlight arc ──
-        bctx.setLineDash([]);
-        bctx.strokeStyle = "rgba(230,170,18,0.95)";
-        bctx.lineWidth = 2.5;
-        bctx.beginPath();
-        bctx.ellipse(cx, cy, rx, ry, 0, headA - fovRad / 2, headA + fovRad / 2);
-        bctx.stroke();
-        // Inner edge of highlighted arc
-        bctx.strokeStyle = "rgba(230,170,18,0.45)";
-        bctx.lineWidth = 1;
-        bctx.beginPath();
-        bctx.ellipse(
-          cx,
-          cy,
-          rx * innerScale,
-          ry * innerScale,
-          0,
-          headA - fovRad / 2,
-          headA + fovRad / 2,
-        );
-        bctx.stroke();
+        // ── Top rim outline (projected polyline, far on bkctx, near on bctx) ──
+        for (let pass = 0; pass < 2; pass++) {
+          const dc = pass === 0 ? bkctx : bctx;
+          const rimPts = [];
+          for (let i = 0; i <= N; i++) {
+            const a = (i / N) * 2 * Math.PI - Math.PI / 2;
+            const isFar = camHX * Math.cos(a) + camHZ * Math.sin(a) < 0;
+            if (pass === 0 && !isFar) continue;
+            if (pass === 1 && isFar) continue;
+            const pt = proj(CYL_R * Math.cos(a), CYL_Y_T, CYL_R * Math.sin(a));
+            if (pt) rimPts.push(pt);
+          }
+          if (rimPts.length > 1) {
+            dc.strokeStyle = "rgba(0,0,0,0.18)";
+            dc.lineWidth = 0.8;
+            dc.beginPath();
+            dc.moveTo(rimPts[0][0], rimPts[0][1]);
+            for (let j = 1; j < rimPts.length; j++)
+              dc.lineTo(rimPts[j][0], rimPts[j][1]);
+            dc.stroke();
+          }
+        }
+
+        // ── FOV arc on top rim (projected polyline) ──
+        const arcPts = [];
+        for (let i = 0; i <= 40; i++) {
+          const a = headA - fovRad / 2 + (fovRad * i) / 40;
+          const pt = proj(CYL_R * Math.cos(a), CYL_Y_T, CYL_R * Math.sin(a));
+          if (pt) arcPts.push(pt);
+        }
+        if (arcPts.length > 1) {
+          bctx.setLineDash([]);
+          bctx.strokeStyle = "rgba(230,170,18,0.95)";
+          bctx.lineWidth = 2.5;
+          bctx.beginPath();
+          bctx.moveTo(arcPts[0][0], arcPts[0][1]);
+          for (let j = 1; j < arcPts.length; j++)
+            bctx.lineTo(arcPts[j][0], arcPts[j][1]);
+          bctx.stroke();
+        }
 
         // ── Arc endpoint dots ──
-        const arcLX = cx + Math.cos(headA - fovRad / 2) * rx;
-        const arcLY = cy + Math.sin(headA - fovRad / 2) * ry;
-        const arcRX = cx + Math.cos(headA + fovRad / 2) * rx;
-        const arcRY = cy + Math.sin(headA + fovRad / 2) * ry;
-
-        [arcLX, arcRX].forEach((x, i) => {
-          const y = i === 0 ? arcLY : arcRY;
+        const arcL = proj(
+          CYL_R * Math.cos(headA - fovRad / 2),
+          CYL_Y_T,
+          CYL_R * Math.sin(headA - fovRad / 2),
+        );
+        const arcR = proj(
+          CYL_R * Math.cos(headA + fovRad / 2),
+          CYL_Y_T,
+          CYL_R * Math.sin(headA + fovRad / 2),
+        );
+        [arcL, arcR].filter(Boolean).forEach(([ax, ay]) => {
           bctx.fillStyle = "rgba(230,170,18,0.9)";
           bctx.beginPath();
-          bctx.arc(x, y, 4, 0, Math.PI * 2);
+          bctx.arc(ax, ay, 4, 0, Math.PI * 2);
           bctx.fill();
         });
 
-        // ══ SIGHT / PROJECTION LINES ═════════════════════════════
-        // The window is placed on the model face, at a small offset
-        // from center in the heading direction. Two dashed lines run
-        // from the window's left/right corners to the FOV arc endpoints.
-        // This visualises the window-as-projector concept.
+        // ── V-shaped sight lines: window center → FOV arc endpoints ──
+        // Window center from Blender (-0.0155, 0.7347, 0.487) → Three.js ≈ face at heading, y≈0
+        const Hr = (S.heading * Math.PI) / 180;
+        const winPt = proj(0.45 * Math.sin(Hr), 0.02, -0.45 * Math.cos(Hr));
+        if (winPt && arcL && arcR) {
+          const [apexX, apexY] = winPt;
+          bctx.setLineDash([4, 4]);
+          bctx.lineWidth = 1.4;
+          bctx.strokeStyle = "rgba(50,80,220,0.72)";
+          bctx.beginPath();
+          bctx.moveTo(apexX, apexY);
+          bctx.lineTo(arcL[0], arcL[1]);
+          bctx.stroke();
+          bctx.beginPath();
+          bctx.moveTo(apexX, apexY);
+          bctx.lineTo(arcR[0], arcR[1]);
+          bctx.stroke();
+          bctx.setLineDash([]);
+          bctx.fillStyle = "rgba(50,80,220,0.85)";
+          bctx.beginPath();
+          bctx.arc(apexX, apexY, 3, 0, Math.PI * 2);
+          bctx.fill();
+        }
 
-        // "Window" position relative to diagram center
-        const wOffset = rx * innerScale * 0.46; // depth of window from center
-        const wHalfW = Math.tan(fovRad / 2) * wOffset; // half-width at that depth
-        const perpA = headA + Math.PI / 2;
+        // ── Heading dot on top rim ──
+        const hdotPt = proj(
+          CYL_R * Math.cos(headA),
+          CYL_Y_T,
+          CYL_R * Math.sin(headA),
+        );
+        if (hdotPt) {
+          bctx.fillStyle = "#222";
+          bctx.beginPath();
+          bctx.arc(hdotPt[0], hdotPt[1], 4, 0, Math.PI * 2);
+          bctx.fill();
+          bctx.strokeStyle = "#fff";
+          bctx.lineWidth = 1.5;
+          bctx.stroke();
+        }
 
-        // Apex (window centre)
-        const apexX = cx + Math.cos(headA) * wOffset;
-        const apexY = cy + Math.sin(headA) * wOffset * yScale;
-
-        // Left and right window corners (accounting for ellipse y-squash)
-        const wLX = apexX + Math.cos(perpA) * wHalfW;
-        const wLY = apexY + Math.sin(perpA) * wHalfW * yScale;
-        const wRX = apexX - Math.cos(perpA) * wHalfW;
-        const wRY = apexY - Math.sin(perpA) * wHalfW * yScale;
-
-        // Dashed lines: window corners → FOV arc endpoints
-        bctx.setLineDash([4, 4]);
-        bctx.lineWidth = 1.4;
-        bctx.strokeStyle = "rgba(50, 80, 220, 0.72)";
-
-        bctx.beginPath();
-        bctx.moveTo(wLX, wLY);
-        bctx.lineTo(arcLX, arcLY);
-        bctx.stroke();
-        bctx.beginPath();
-        bctx.moveTo(wRX, wRY);
-        bctx.lineTo(arcRX, arcRY);
-        bctx.stroke();
-
-        bctx.setLineDash([]);
-
-        // Window marker: a short line segment across heading direction
-        // (represents the window aperture in top-down view)
-        bctx.lineWidth = 2.5;
-        bctx.strokeStyle = "rgba(255,255,255,0.95)";
-        bctx.beginPath();
-        bctx.moveTo(wLX, wLY);
-        bctx.lineTo(wRX, wRY);
-        bctx.stroke();
-        bctx.lineWidth = 1.5;
-        bctx.strokeStyle = "rgba(50, 80, 220, 0.85)";
-        bctx.beginPath();
-        bctx.moveTo(wLX, wLY);
-        bctx.lineTo(wRX, wRY);
-        bctx.stroke();
-
-        // Small dot at window centre (apex)
-        bctx.fillStyle = "rgba(50, 80, 220, 0.85)";
-        bctx.beginPath();
-        bctx.arc(apexX, apexY, 2.5, 0, Math.PI * 2);
-        bctx.fill();
-
-        // ── Heading dot on outer belt ──
-        const hdotX = cx + Math.cos(headA) * rx;
-        const hdotY = cy + Math.sin(headA) * ry;
-        bctx.fillStyle = "#222";
-        bctx.beginPath();
-        bctx.arc(hdotX, hdotY, 4, 0, Math.PI * 2);
-        bctx.fill();
-        bctx.strokeStyle = "#fff";
-        bctx.lineWidth = 1.5;
-        bctx.stroke();
-
-        // ── Compass labels ──
+        // ── Compass labels (projected outside bottom rim) ──
         bctx.font = "bold 9px system-ui";
         bctx.textAlign = "center";
         bctx.textBaseline = "middle";
+        const LR = CYL_R * 1.2;
         [
           ["N", -Math.PI / 2],
           ["E", 0],
           ["S", Math.PI / 2],
           ["W", Math.PI],
         ].forEach(([l, a]) => {
-          bctx.fillStyle = "#666";
-          bctx.fillText(
-            l,
-            cx + Math.cos(a) * (rx + 13),
-            cy + Math.sin(a) * (ry + 9),
-          );
+          const pt = proj(LR * Math.cos(a), CYL_Y_B * 0.4, LR * Math.sin(a));
+          if (pt) {
+            bctx.fillStyle = "#666";
+            bctx.fillText(l, pt[0], pt[1]);
+          }
         });
       }
 
@@ -1132,6 +1167,7 @@
         document.getElementById("tabV").classList.remove("active");
         document.getElementById("diagramWrap").style.display = "none";
         document.getElementById("sunImg").style.display = "block";
+        bkctx.clearRect(0, 0, backBeltCanvas.width, backBeltCanvas.height);
         bctx.clearRect(0, 0, beltCanvas.width, beltCanvas.height);
       });
 
