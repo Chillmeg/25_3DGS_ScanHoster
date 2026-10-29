@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Logic analyzer on Windows: quick start</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@500;700&family=Red+Hat+Text:ital,wght@0,400;0,500;0,600;1,400&family=Red+Hat+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EEF1EC; --panel:#F8FAF7; --ink:#17251E; --soft:#4A5B51; --line:#C9D3CA;
+  --mask:#1F5C42; --copper:#A86A1E; --trace:#1F8A5B; --screen:#0F1A14; --grid:#2A3D31;
+  --digital:#6FA83A; --analog:#D9732F; --iic:#6E6E6E; --power:#D23B33; --uart:#2B9BD1; --spi:#3E7A35; --gpio:#7F93A6;
+  --codebg:#1B2620; --codeink:#E3ECE5;
+  --sans:"Red Hat Text", "Segoe UI", Helvetica, Arial, sans-serif;
+  --display:"Red Hat Display", "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono:"Red Hat Mono", ui-monospace, Menlo, Consolas, monospace;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#111814; --panel:#18211C; --ink:#E4EBE5; --soft:#A3B3A8; --line:#2D3B32;
+    --mask:#83C9A3; --copper:#DDA45C; --trace:#4FD08F; --screen:#0A110D; --grid:#22352A;
+    --codebg:#0C130F; --codeink:#DCE7DF;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#111814; --panel:#18211C; --ink:#E4EBE5; --soft:#A3B3A8; --line:#2D3B32;
+  --mask:#83C9A3; --copper:#DDA45C; --trace:#4FD08F; --screen:#0A110D; --grid:#22352A;
+  --codebg:#0C130F; --codeink:#DCE7DF;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 17px/1.65 var(--sans);-webkit-font-smoothing:antialiased}
+a{color:var(--mask);text-underline-offset:3px}
+a:focus-visible,button:focus-visible{outline:2px solid var(--copper);outline-offset:2px}
+h1,h2,h3{font-family:var(--display);line-height:1.15;margin:0}
+h2{font-size:1.75rem;font-weight:700;margin:0 0 .6rem}
+h3{font-size:1.15rem;font-weight:700;margin:1.6rem 0 .4rem}
+p{margin:0 0 1rem}
+code{font-family:var(--mono);font-size:.92em;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:0 .3em}
+.col{max-width:720px;margin-left:auto;margin-right:auto;padding-left:20px;padding-right:20px}
+.wide{max-width:1040px;margin-left:auto;margin-right:auto;padding-left:20px;padding-right:20px}
+section{padding:3.2rem 0 1rem}
+.lede{font-size:1.1rem;color:var(--soft);max-width:62ch}
+.rule{border:0;border-top:1px solid var(--line);margin:0}
+
+/* hero */
+header{padding:3.5rem 0 1rem}
+header h1{font-size:clamp(2.3rem,6vw,3.8rem);font-weight:700;letter-spacing:-.02em;max-width:14ch;margin-bottom:1rem}
+.scope{background:var(--screen);border-radius:10px;padding:14px;margin-top:2rem;overflow:hidden}
+.scope svg{display:block;width:100%;height:auto}
+.scope .cap{display:flex;justify-content:space-between;color:#9FB8A8;font:500 13px var(--mono);margin-top:8px;gap:12px;flex-wrap:wrap}
+@media (prefers-reduced-motion:no-preference){
+  #hero-trace{stroke-dasharray:2400;stroke-dashoffset:2400;animation:draw 2.4s ease-out .3s forwards}
+  @keyframes draw{to{stroke-dashoffset:0}}
+}
+nav.toc{display:flex;flex-wrap:wrap;gap:6px 18px;margin:1.6rem 0 0;font-size:.95rem}
+nav.toc a{text-decoration:none;border-bottom:1px solid var(--line)}
+
+/* pinout */
+.pinout{background:#fff;border-radius:12px;padding:12px;border:1px solid var(--line)}
+.pinout img{display:block;width:100%;height:auto}
+.legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:4px 28px;margin:1.4rem 0 0;padding:0;list-style:none}
+.legend li{display:grid;grid-template-columns:14px 1fr;gap:10px;padding:.55rem 0;border-bottom:1px solid var(--line);font-size:.95rem}
+.sw{width:14px;height:14px;border-radius:3px;margin-top:.35em}
+
+/* glossary */
+.gloss h3{font-size:1rem;color:var(--soft);font-weight:500;font-family:var(--sans);margin:2rem 0 .3rem}
+dl{margin:0}
+.term{display:grid;grid-template-columns:minmax(120px,170px) 1fr;gap:4px 18px;padding:.7rem 0;border-bottom:1px solid var(--line)}
+.term dt{font-family:var(--display);font-weight:700;display:flex;align-items:baseline;gap:8px}
+.term dt .sw{flex:none;margin-top:0;align-self:center}
+.term dd{margin:0}
+.term dd small{display:block;color:var(--soft);font-size:.88rem}
+@media (max-width:560px){.term{grid-template-columns:1fr}}
+
+/* signal kinds */
+.kinds{display:grid;gap:0;margin-top:1rem}
+.kind{display:grid;grid-template-columns:150px 1fr;gap:6px 22px;align-items:center;padding:1rem 0;border-bottom:1px solid var(--line)}
+.kind svg{width:150px;height:56px;background:var(--screen);border-radius:6px}
+.kind h3{margin:0 0 .2rem;font-size:1.05rem}
+.kind p{margin:0;font-size:.95rem}
+.kind .read{color:var(--soft);font-size:.9rem;margin-top:.3rem}
+@media (max-width:560px){.kind{grid-template-columns:1fr}}
+
+/* how-to boxes */
+.steps{counter-reset:s;list-style:none;padding:0;margin:.4rem 0 1rem}
+.steps li{counter-increment:s;position:relative;padding:.35rem 0 .35rem 2.2rem}
+.steps li::before{content:counter(s);position:absolute;left:0;top:.45rem;width:1.5rem;height:1.5rem;border-radius:50%;border:1.5px solid var(--copper);color:var(--copper);font:600 .8rem/1.35rem var(--sans);text-align:center}
+
+/* bench */
+.bench{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+.tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.tabs button,.lang button{font:500 .92rem var(--sans);color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:999px;padding:.4rem .9rem;cursor:pointer}
+.tabs button[aria-selected="true"],.lang button[aria-pressed="true"]{background:var(--mask);border-color:var(--mask);color:var(--paper)}
+.benchsvg{width:100%;height:auto;display:block}
+.exp{margin-top:14px;display:grid;grid-template-columns:1fr;gap:4px}
+.exp h3{margin:.6rem 0 .2rem}
+.row{display:grid;grid-template-columns:110px 1fr;gap:4px 16px;padding:.55rem 0;border-top:1px solid var(--line)}
+.row b{font-family:var(--display);font-weight:700;color:var(--copper)}
+.row p{margin:0}
+@media (max-width:560px){.row{grid-template-columns:1fr}}
+.lang{display:flex;gap:8px;align-items:center;margin:.2rem 0 .5rem;flex-wrap:wrap}
+.lang span{color:var(--soft);font-size:.9rem}
+.code{position:relative;margin:.3rem 0 .4rem}
+.code pre code{background:none;border:0;padding:0;color:inherit;font-size:inherit}
+.code pre{margin:0;background:var(--codebg);color:var(--codeink);border-radius:8px;padding:14px 16px;overflow-x:auto;font:400 .9rem/1.55 var(--mono)}
+.copy{position:absolute;top:8px;right:8px;font:500 .78rem var(--sans);background:transparent;color:#B9CCBF;border:1px solid #3A4C41;border-radius:6px;padding:.2rem .55rem;cursor:pointer}
+
+.warn{list-style:none;padding:0;margin:0}
+.warn li{padding:.7rem 0 .7rem 1.2rem;border-bottom:1px solid var(--line);position:relative}
+.warn li::before{content:"";position:absolute;left:0;top:1.15rem;width:8px;height:8px;border-radius:50%;background:var(--power)}
+footer{padding:3rem 0 4rem;color:var(--soft);font-size:.92rem}
+
+table.plan{width:100%;border-collapse:collapse;font-size:.95rem;margin:.4rem 0 1rem;display:block;overflow-x:auto}
+table.plan th{text-align:left;font-family:var(--display);font-weight:700;border-bottom:2px solid var(--line);padding:.5rem .6rem .5rem 0}
+table.plan td{border-bottom:1px solid var(--line);padding:.55rem .6rem .55rem 0;vertical-align:top}
+.where{display:inline-block;font:600 .78rem var(--sans);color:var(--paper);background:var(--mask);border-radius:999px;padding:.1rem .6rem;margin:.4rem 0 .2rem}
+.where.ps{background:#2B6CB0}
+.code{margin:.2rem 0 1rem}
+.code pre{white-space:pre}
+p code,td code{white-space:nowrap}
+.aside{color:var(--soft);font-size:.92rem}
+header{padding:3rem 0 0}
+header h1{max-width:18ch}
+section{padding:2.4rem 0 .5rem}
+</style>
+</head>
+<body>
+<header class="col">
+  <h1>Logic analyzer on Windows: quick start</h1>
+  <p class="lede">The commands to run every time you restart, and what to do when the analyzer won't attach. For the HiLetgo analyzer, running PulseView inside WSL.</p>
+</header>
+
+<section class="col" id="every">
+  <h2>Every time you restart</h2>
+  <p>Setup is remembered, so after a restart you only need two commands.</p>
+  <p><strong>1. Plug in the analyzer</strong>, then attach it to WSL. Normal PowerShell, no administrator needed:</p>
+  <span class="where ps">PowerShell</span>
+  <div class="code"><pre><code>usbipd attach --wsl --busid 2-5 --auto-attach</code></pre><button type="button" class="copy">Copy</button></div>
+  <p>Wait for <code>Device 2-5 is now attached</code>. <strong>Leave this window open.</strong></p>
+  <p><strong>2. Start PulseView:</strong></p>
+  <span class="where">Ubuntu</span>
+  <div class="code"><pre><code>sudo pulseview</code></pre><button type="button" class="copy">Copy</button></div>
+  <p>The toolbar should say <strong>Saleae Logic</strong>. If it says Demo device: open the dropdown, Connect to Device, driver <strong>fx2lafw</strong>, Scan, select Saleae Logic, OK.</p>
+  <p class="aside">Ignore <code>XDG_RUNTIME_DIR not set</code> and <code>bt-bluez: devid failed</code>. They're harmless.</p>
+</section>
+
+<section class="col" id="fail">
+  <h2>"Failed to attach device"</h2>
+  <p>The loop sees the analyzer on the Windows side, but WSL can't connect to it. Press <strong>Ctrl+C</strong> to stop the loop, then work through these in order.</p>
+
+  <p><strong>1. Load WSL's USB support.</strong> After a restart it sometimes isn't loaded yet. Make sure Ubuntu is open, then:</p>
+  <span class="where">Ubuntu</span>
+  <div class="code"><pre><code>sudo modprobe vhci_hcd</code></pre><button type="button" class="copy">Copy</button></div>
+
+  <p><strong>2. Clear any leftover state and check the analyzer is shared:</strong></p>
+  <span class="where ps">PowerShell</span>
+  <div class="code"><pre><code>usbipd detach --busid 2-5
+usbipd list</code></pre><button type="button" class="copy">Copy</button></div>
+  <p>The 2-5 row should say <strong>Shared</strong>. If it says <strong>Not shared</strong>, share it again from an administrator PowerShell (right-click PowerShell, Run as administrator):</p>
+  <span class="where ps">PowerShell (administrator)</span>
+  <div class="code"><pre><code>usbipd bind --busid 2-5</code></pre><button type="button" class="copy">Copy</button></div>
+
+  <p><strong>3. Attach once without the loop</strong>, so it prints the real error instead of retrying:</p>
+  <span class="where ps">PowerShell</span>
+  <div class="code"><pre><code>usbipd attach --wsl --busid 2-5</code></pre><button type="button" class="copy">Copy</button></div>
+  <p>If that works, go back to the normal <code>--auto-attach</code> command above.</p>
+
+  <p><strong>4. Still failing? Check your network.</strong> A <strong>VPN</strong> (like MIT's Cisco VPN) or a firewall change can block WSL from reaching Windows. Disconnect the VPN and try step 3 again.</p>
+
+  <p><strong>5. Last resort: restart WSL.</strong></p>
+  <span class="where ps">PowerShell</span>
+  <div class="code"><pre><code>wsl --shutdown</code></pre><button type="button" class="copy">Copy</button></div>
+  <p>Reopen Ubuntu, run step 1 again, then attach.</p>
+</section>
+
+<section class="col" id="other">
+  <h2>Other problems</h2>
+  <table class="plan">
+    <tr><th>What you see</th><th>Fix</th></tr>
+    <tr><td><code>There is no device with busid</code></td><td>The analyzer is in a different USB port. Run <code>usbipd list</code>, find the <strong>0925:3881</strong> row, and use its BUSID. The first time on a new port, bind it as administrator.</td></tr>
+    <tr><td><code>Access denied</code></td><td>That command needs an administrator PowerShell.</td></tr>
+    <tr><td><code>lsusb</code> in Ubuntu prints nothing</td><td>Not attached. Go through "Failed to attach device" above.</td></tr>
+    <tr><td>PulseView scan finds nothing</td><td>Check <code>lsusb</code> shows <code>0925:3881</code> or <code>1d50:608c</code>. Make sure you started PulseView with <code>sudo</code>.</td></tr>
+    <tr><td>PulseView icon on the taskbar, no window</td><td>Click the icon, press Alt+Space, then M, tap an arrow key and move the mouse. Or start it with <code>sudo QT_QPA_PLATFORM=xcb pulseview</code>.</td></tr>
+    <tr><td>Overflow errors when capturing</td><td>Lower the sample rate. 4 MHz is enough for the QPAD's I2C.</td></tr>
+  </table>
+</section>
+
+<section class="col" id="done">
+  <h2>When you're done</h2>
+  <ol class="steps">
+    <li>Re-upload the QPAD example so the board is back to normal.</li>
+    <li>Close PulseView.</li>
+    <li>Press Ctrl+C in the PowerShell window to stop the attach loop.</li>
+  </ol>
+</section>
+
+<footer class="col">
+  <hr class="rule" style="margin-bottom:1.4rem">
+  <p>BUSID 2-5 is this laptop's port; yours may differ. Full setup, experiments and explanations: the "Read what your chips are saying" logic analyzer guide.</p>
+</footer>
+
+<script>document.addEventListener('click',ev=>{const cb=ev.target.closest('.copy');if(!cb)return;
+const t=cb.parentElement.querySelector('code').textContent;
+try{navigator.clipboard.writeText(t).then(()=>{cb.textContent='Copied';setTimeout(()=>cb.textContent='Copy',1500);},()=>{cb.textContent='Select and copy';});}catch(e){cb.textContent='Select and copy';}});</script>
+</body>
+</html>
